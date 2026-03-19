@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### 修复
+
+- 🌍 **修复 `REPORT_LANGUAGE` 启动时被旧进程环境覆盖的问题** — `Config` 现在会在加载报告语言时优先读取活动 `.env` 文件中的 `REPORT_LANGUAGE`，避免 Web/API 服务重启后仍沿用外层遗留的 `REPORT_LANGUAGE=zh`，导致 Agent Prompt、推送和历史记录继续生成中文报告；当进程环境与 `.env` 冲突时，会追加显式告警日志便于排查。
+
 ### 新功能
 
 - 🔎 **SearXNG 公共实例自动发现与受控轮询**（#752）— 新增 `SEARXNG_PUBLIC_INSTANCES_ENABLED`，在未配置 `SEARXNG_BASE_URLS` 时默认从 `searx.space` 拉取公共实例列表，并按受控轮询顺序选择实例；同次请求内遇到超时、连接错误、HTTP 非 200 或无效 JSON 会自动切换到下一个实例。已配置自建实例的用户保持原有优先级与语义不变；`daily_analysis` GitHub Actions 工作流也已支持显式透传该开关并在启动日志中展示当前状态。
