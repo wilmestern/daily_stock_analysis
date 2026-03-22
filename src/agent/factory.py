@@ -51,6 +51,7 @@ class SkillPromptState:
     skill_manager: object
     skills_to_activate: List[str]
     explicit_skill_selection: bool
+    use_legacy_default_prompt: bool
     skill_instructions: str
     default_skill_policy: str
     technical_skill_policy: str
@@ -142,6 +143,12 @@ def resolve_skill_prompt_state(config=None, skills: Optional[List[str]] = None) 
     else:
         skills_to_activate = configured_skills or default_skills
 
+    use_legacy_default_prompt = (
+        bool(default_skills)
+        and len(skills_to_activate) == len(default_skills)
+        and skills_to_activate == default_skills
+    )
+
     skill_manager.activate(skills_to_activate)
     logger.info("[AgentFactory] Activated skills: %s", skills_to_activate)
 
@@ -149,12 +156,13 @@ def resolve_skill_prompt_state(config=None, skills: Optional[List[str]] = None) 
         skill_manager=skill_manager,
         skills_to_activate=skills_to_activate,
         explicit_skill_selection=explicit_skill_selection,
+        use_legacy_default_prompt=use_legacy_default_prompt,
         skill_instructions=skill_manager.get_skill_instructions(),
         default_skill_policy=get_default_trading_skill_policy(
-            explicit_skill_selection=explicit_skill_selection,
+            explicit_skill_selection=not use_legacy_default_prompt,
         ),
         technical_skill_policy=get_default_technical_skill_policy(
-            explicit_skill_selection=explicit_skill_selection,
+            explicit_skill_selection=not use_legacy_default_prompt,
         ),
     )
 
@@ -188,10 +196,11 @@ def build_agent_executor(config=None, skills: Optional[List[str]] = None):
     prompt_state = resolve_skill_prompt_state(config, skills=skills)
     skill_manager = prompt_state.skill_manager
     logger.info(
-        "[AgentFactory] Resolved skill prompt state: skills=%s (arch=%s, explicit=%s)",
+        "[AgentFactory] Resolved skill prompt state: skills=%s (arch=%s, explicit=%s, legacy_default_prompt=%s)",
         prompt_state.skills_to_activate,
         arch,
         prompt_state.explicit_skill_selection,
+        prompt_state.use_legacy_default_prompt,
     )
 
     llm_adapter = LLMToolAdapter(config)
@@ -211,6 +220,7 @@ def build_agent_executor(config=None, skills: Optional[List[str]] = None):
         llm_adapter=llm_adapter,
         skill_instructions=prompt_state.skill_instructions,
         default_skill_policy=prompt_state.default_skill_policy,
+        use_legacy_default_prompt=prompt_state.use_legacy_default_prompt,
         max_steps=getattr(config, "agent_max_steps", 10),
         timeout_seconds=getattr(config, "agent_orchestrator_timeout_s", 0),
     )
