@@ -205,9 +205,9 @@ class AskCommand(BotCommand):
         """Execute the ask command via Agent pipeline. Supports multi-stock."""
         config = get_config()
 
-        if not config.is_agent_available():
+        if not config.agent_mode:
             return BotResponse.text_response(
-                "⚠️ Agent 模式不可用，无法使用问股功能。\n请配置 `LITELLM_MODEL` 或设置 `AGENT_MODE=true`。"
+                "⚠️ Agent 模式未开启，无法使用问股功能。\n请在配置中设置 `AGENT_MODE=true`。"
             )
 
         raw_code_str, remaining_args = self._merge_code_args(args)

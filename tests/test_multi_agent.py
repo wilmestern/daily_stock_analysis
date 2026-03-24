@@ -1341,21 +1341,11 @@ class TestResearchCommandTimeout(unittest.TestCase):
     """Verify that ResearchCommand respects the configured timeout."""
 
     def test_research_timeout_returns_timeout_response(self):
-        """When research takes longer than the timeout, a timeout message is returned."""
-        import time as _time
+        """Timed-out research results should surface the timeout response text."""
         from bot.commands.research import ResearchCommand
         from bot.models import BotMessage
 
         cmd = ResearchCommand()
-
-        slow_result = SimpleNamespace(
-            success=True, report="ok", sub_questions=["q"], findings_count=1,
-            total_tokens=100, duration_s=1.0, error=None,
-        )
-
-        def _slow_research(query, context=None):
-            _time.sleep(0.05)
-            return slow_result
 
         msg = MagicMock(spec=BotMessage)
         msg.platform = "test"
@@ -1367,12 +1357,20 @@ class TestResearchCommandTimeout(unittest.TestCase):
             litellm_model="test-model",
             agent_mode=True,
         )
-        config.is_agent_available = lambda: True
 
         with patch("bot.commands.research.get_config", return_value=config), \
              patch("src.agent.factory.get_tool_registry", return_value=MagicMock()), \
              patch("src.agent.llm_adapter.LLMToolAdapter", return_value=MagicMock()), \
-             patch("src.agent.research.ResearchAgent.research", side_effect=_slow_research):
+             patch("src.agent.research.ResearchAgent.research", return_value=SimpleNamespace(
+                 success=False,
+                 report="",
+                 sub_questions=["q"],
+                 findings_count=1,
+                 total_tokens=100,
+                 duration_s=0.01,
+                 error="Deep research timed out after 0.01s",
+                 timed_out=True,
+             )):
             response = cmd.execute(msg, ["600519"])
 
         self.assertIn("超时", response.text)
@@ -1394,12 +1392,14 @@ class TestResearchCommandTimeout(unittest.TestCase):
             total_tokens=100,
             duration_s=1.0,
             error=None,
+            timed_out=False,
         )
         captured = {}
 
-        def _capture_research(query, context=None):
+        def _capture_research(query, context=None, timeout_seconds=None):
             captured["query"] = query
             captured["context"] = context
+            captured["timeout_seconds"] = timeout_seconds
             return result
 
         config = SimpleNamespace(
@@ -1408,7 +1408,6 @@ class TestResearchCommandTimeout(unittest.TestCase):
             litellm_model="test-model",
             agent_mode=True,
         )
-        config.is_agent_available = lambda: True
 
         with patch("bot.commands.research.get_config", return_value=config), \
              patch("src.agent.factory.get_tool_registry", return_value=MagicMock()), \
@@ -1418,6 +1417,7 @@ class TestResearchCommandTimeout(unittest.TestCase):
 
         self.assertIn("Deep Research Report", response.text)
         self.assertEqual(captured["context"], {"stock_code": "GOOGL", "stock_name": ""})
+        self.assertEqual(captured["timeout_seconds"], 1)
         self.assertTrue(captured["query"].startswith("[Stock: GOOGL]"))
 
 
@@ -1492,11 +1492,28 @@ class TestResearchAgentFilteredRegistry(unittest.TestCase):
         self.assertFalse(result.success)
         self.assertEqual(result.error, "boom")
 
+    def test_research_returns_timeout_result_when_overall_deadline_is_exceeded(self):
+        import time as _time
+        from src.agent.research import ResearchAgent
+
+        agent = ResearchAgent(tool_registry=MagicMock(), llm_adapter=MagicMock())
+
+        def _slow_sub_question(*args, **kwargs):
+            _time.sleep(0.02)
+            return {"question": "Q1", "content": "done", "tokens": 7, "success": True}
+
+        with patch.object(agent, "_decompose_query", return_value={"questions": ["Q1"], "tokens": 3}), \
+             patch.object(agent, "_research_sub_question", side_effect=_slow_sub_question):
+            result = agent.research("分析 600519", timeout_seconds=0.01)
+
+        self.assertFalse(result.success)
+        self.assertTrue(result.timed_out)
+        self.assertIn("timed out", result.error)
+
 
 class TestAgentResearchEndpoint(unittest.IsolatedAsyncioTestCase):
     async def test_agent_research_returns_timeout_response(self):
         from api.v1.endpoints.agent import ResearchRequest, agent_research
-        from concurrent.futures import TimeoutError as FuturesTimeoutError
 
         config = SimpleNamespace(
             litellm_model="gemini/test-model",
@@ -1506,7 +1523,16 @@ class TestAgentResearchEndpoint(unittest.IsolatedAsyncioTestCase):
         )
 
         with patch("api.v1.endpoints.agent.get_config", return_value=config), \
-             patch("api.v1.endpoints.agent._run_research_in_background", new=AsyncMock(side_effect=FuturesTimeoutError)), \
+             patch("api.v1.endpoints.agent._run_research_in_background", new=AsyncMock(return_value=SimpleNamespace(
+                 success=False,
+                 report="",
+                 sub_questions=[],
+                 findings_count=0,
+                 total_tokens=0,
+                 duration_s=1.0,
+                 error="Deep research timed out after 1s",
+                 timed_out=True,
+             ))), \
              patch("src.agent.factory.get_tool_registry", return_value=MagicMock()), \
              patch("src.agent.llm_adapter.LLMToolAdapter", return_value=MagicMock()):
             response = await agent_research(ResearchRequest(question="600519 风险"))

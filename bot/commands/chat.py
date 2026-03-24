@@ -77,10 +77,10 @@ class ChatCommand(BotCommand):
     def execute(self, message: BotMessage, args: list[str]) -> BotResponse:
         """Execute the chat command."""
         config = get_config()
-        
-        if not config.is_agent_available():
+
+        if not config.agent_mode:
             return BotResponse.text_response(
-                "⚠️ Agent 模式不可用，无法使用对话功能。\n请配置 `LITELLM_MODEL` 或设置 `AGENT_MODE=true`。"
+                "⚠️ Agent 模式未开启，无法使用对话功能。\n请在配置中设置 `AGENT_MODE=true`。"
             )
             
         if not args:

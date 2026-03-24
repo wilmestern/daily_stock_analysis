@@ -11,7 +11,6 @@ Usage:
 import logging
 import re
 import time
-from concurrent.futures import Future, ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 from typing import List, Optional
 
 from bot.commands.base import BotCommand
@@ -61,10 +60,9 @@ class ResearchCommand(BotCommand):
 
         config = get_config()
 
-        # Check agent availability (consistent with /chat and API)
-        if not config.is_agent_available():
+        if not config.agent_mode:
             return BotResponse.text_response(
-                "⚠️ Agent mode is not available. Configure LITELLM_MODEL or set AGENT_MODE=true to use /research."
+                "⚠️ Agent 模式未开启，无法使用深度研究功能。\n请在配置中设置 `AGENT_MODE=true`。"
             )
 
         # Parse arguments — first arg may be stock code, rest is the question
@@ -104,36 +102,21 @@ class ResearchCommand(BotCommand):
                 token_budget=budget,
             )
 
-            # Deep research can take minutes; cap with a timeout to prevent
-            # indefinite blocking on Bot platforms with response-time limits.
-            # IMPORTANT: we must NOT use `with ThreadPoolExecutor(...)` because
-            # __exit__ calls shutdown(wait=True), which blocks until the thread
-            # finishes — defeating the timeout.  Instead we create the pool
-            # manually and call shutdown(wait=False) on the timeout path so the
-            # caller returns immediately (the orphan thread finishes in the
-            # background).
             research_timeout = getattr(config, "agent_deep_research_timeout", 180)
             logger.info("[ResearchCommand] Starting deep research (timeout=%ds): %s", research_timeout, question[:100])
             t0 = time.time()
-
-            pool = ThreadPoolExecutor(max_workers=1)
-            future: Future = pool.submit(
-                agent.research,
+            result = agent.research(
                 question,
                 {"stock_code": stock_code, "stock_name": ""} if stock_code else None,
+                timeout_seconds=research_timeout,
             )
-            try:
-                result = future.result(timeout=research_timeout)
-            except FuturesTimeoutError:
-                duration = round(time.time() - t0, 1)
+            duration = result.duration_s or round(time.time() - t0, 1)
+
+            if getattr(result, "timed_out", False):
                 logger.warning("[ResearchCommand] Deep research timed out after %ss", duration)
                 return BotResponse.text_response(
                     f"⏳ 深度研究超时（{duration}s / {research_timeout}s），请稍后重试或缩小研究范围。"
                 )
-            finally:
-                pool.shutdown(wait=False, cancel_futures=True)
-
-            duration = round(time.time() - t0, 1)
 
             if result.success:
                 # Build rich response

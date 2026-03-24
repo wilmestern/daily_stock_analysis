@@ -123,7 +123,7 @@ class TestCommandDispatcherAsync(unittest.IsolatedAsyncioTestCase):
 
         config = SimpleNamespace(
             agent_nl_routing=True,
-            is_agent_available=lambda: True,
+            agent_mode=True,
             litellm_model="gemini/test-model",
         )
 
@@ -148,7 +148,7 @@ class TestCommandDispatcherAsync(unittest.IsolatedAsyncioTestCase):
 
         config = SimpleNamespace(
             agent_nl_routing=True,
-            is_agent_available=lambda: True,
+            agent_mode=True,
             litellm_model="gemini/test-model",
         )
 
@@ -233,7 +233,7 @@ class TestChatCommandCompatibility(unittest.TestCase):
         from bot.commands.chat import ChatCommand
 
         command = ChatCommand()
-        config = SimpleNamespace(is_agent_available=lambda: True)
+        config = SimpleNamespace(agent_mode=True)
         executor = MagicMock()
         executor.chat.return_value = SimpleNamespace(success=True, content="ok", error=None)
         db = MagicMock()
@@ -252,7 +252,7 @@ class TestChatCommandCompatibility(unittest.TestCase):
         from bot.commands.chat import ChatCommand
 
         command = ChatCommand()
-        config = SimpleNamespace(is_agent_available=lambda: True)
+        config = SimpleNamespace(agent_mode=True)
         executor = MagicMock()
         executor.chat.return_value = SimpleNamespace(success=True, content="ok", error=None)
         db = MagicMock()

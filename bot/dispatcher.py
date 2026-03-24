@@ -480,8 +480,9 @@ User: "analyze TSLA and NVDA using trend strategy"
         if not is_private and not message.mentioned:
             return None
 
-        # Agent must be available
-        if not config.is_agent_available():
+        # Keep Bot-side Agent entrypoints behind explicit opt-in so NL routing
+        # cannot bypass AGENT_MODE=false.
+        if not getattr(config, 'agent_mode', False):
             return None
 
         text = message.content.strip()
@@ -549,7 +550,7 @@ User: "analyze TSLA and NVDA using trend strategy"
         if not is_private and not message.mentioned:
             return None
 
-        if not config.is_agent_available():
+        if not getattr(config, 'agent_mode', False):
             return None
 
         text = message.content.strip()

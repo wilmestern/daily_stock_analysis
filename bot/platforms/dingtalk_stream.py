@@ -156,9 +156,9 @@ class DingtalkStreamHandler:
 
             # 提取 sessionWebhook，便于异步推送
             session_webhook = (
-                getattr(incoming, 'session_webhook', None)
-                or raw_data.get('sessionWebhook')
-                or raw_data.get('session_webhook')
+                    getattr(incoming, 'session_webhook', None)
+                    or raw_data.get('sessionWebhook')
+                    or raw_data.get('session_webhook')
             )
             if session_webhook:
                 raw_data['_session_webhook'] = session_webhook
