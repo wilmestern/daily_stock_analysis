@@ -230,6 +230,7 @@ def test_sanitize_llm_log_preview_redacts_single_quoted_credential_fields():
         ("Authorization: Bearer raw-secret-token", "Authorization=Bearer [REDACTED]"),
         ("Authorization: Basic dXNlcjpwYXNz", "Authorization=Basic [REDACTED]"),
         ("Authorization: Token abc123", "Authorization=Token [REDACTED]"),
+        ("Authorization: raw-secret-token session_id=abc123", "Authorization=[REDACTED]"),
         (
             'Authorization: Signature keyId="abc",algorithm="hmac-sha256",signature="xyz"',
             "Authorization=Signature [REDACTED]",
@@ -253,6 +254,7 @@ def test_sanitize_llm_log_preview_redacts_authorization_headers(raw_preview, exp
 
     assert preview == expected_preview
     assert raw_preview.split()[-1] not in preview
+    assert "raw-secret-token" not in preview
 
 
 @pytest.mark.parametrize(
@@ -261,6 +263,7 @@ def test_sanitize_llm_log_preview_redacts_authorization_headers(raw_preview, exp
         ('{"authorization":"Bearer raw-secret-token"}', '{"authorization":"Bearer [REDACTED]"}'),
         ("{'authorization':'Basic dXNlcjpwYXNz'}", "{'authorization':'Basic [REDACTED]'}"),
         ('{"authorization":"Token abc123"}', '{"authorization":"Token [REDACTED]"}'),
+        ('{"authorization":"raw-secret-token session_id=abc123"}', '{"authorization":"[REDACTED]"}'),
     ],
 )
 def test_sanitize_llm_log_preview_redacts_quoted_authorization_headers(raw_preview, expected_preview):
@@ -269,6 +272,7 @@ def test_sanitize_llm_log_preview_redacts_quoted_authorization_headers(raw_previ
     assert preview == expected_preview
     assert "raw-secret-token" not in preview
     assert "dXNlcjpwYXNz" not in preview
+    assert "session_id=abc123" not in preview
 
 
 @pytest.mark.parametrize(

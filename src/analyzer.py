@@ -51,6 +51,21 @@ from src.logging_config import is_sensitive_log_preview_enabled
 logger = logging.getLogger(__name__)
 
 _LLM_PREVIEW_MAX_CHARS = 240
+_LLM_AUTHORIZATION_SAFE_SCHEMES = {
+    "aws4-hmac-sha256",
+    "basic",
+    "bearer",
+    "digest",
+    "dpop",
+    "hoba",
+    "mutual",
+    "negotiate",
+    "ntlm",
+    "pop",
+    "signature",
+    "token",
+    "vapid",
+}
 _LLM_SENSITIVE_ASSIGNMENT_VALUE_PATTERN = (
     r"[^\s]+(?:\s+(?!(?:[\w.-]+|\"[^\"]+\"|'[^']+')\s*[:=])\S+)*"
 )
@@ -61,7 +76,7 @@ _LLM_SENSITIVE_FIELD_NAME_PATTERN = (
 
 def _redact_authorization_preview_value(value: str) -> str:
     parts = str(value or "").strip().split(None, 1)
-    if len(parts) == 2 and parts[0]:
+    if len(parts) == 2 and parts[0] and parts[0].lower() in _LLM_AUTHORIZATION_SAFE_SCHEMES:
         return f"{parts[0]} [REDACTED]"
     return "[REDACTED]"
 
