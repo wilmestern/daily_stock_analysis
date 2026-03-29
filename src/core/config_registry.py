@@ -73,7 +73,7 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "is_sensitive": False,
         "is_required": False,
         "is_editable": True,
-        "default_value": "600519:贵州茅台,300750:宁德时代,002594:比亚迪",
+        "default_value": "600519:Kweichow Moutai,hk00700:Tencent",
         "options": [],
         "validation": {"min_items": 1},
         "display_order": 10,

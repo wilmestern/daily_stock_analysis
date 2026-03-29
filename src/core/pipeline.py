@@ -131,8 +131,65 @@ class StockAnalysisPipeline:
         overrides = getattr(config, "stock_name_overrides", {})
         return overrides if isinstance(overrides, dict) else {}
 
-    def _get_manual_stock_name(self, code: str) -> str:
+    def _lookup_manual_stock_name(self, code: str, lookup: Dict[str, str]) -> str:
+        """Resolve a manual stock name from a prebuilt lookup table."""
+        if not lookup:
+            return ""
+        raw_code = str(code or "").strip()
+        if not raw_code:
+            return ""
+
+        candidates = [raw_code, raw_code.upper()]
+        normalized_code = normalize_stock_code(raw_code)
+        if normalized_code:
+            candidates.extend([normalized_code, normalized_code.upper()])
+
+        seen = set()
+        for candidate in candidates:
+            if not candidate or candidate in seen:
+                continue
+            seen.add(candidate)
+            name = lookup.get(candidate)
+            if isinstance(name, str) and name.strip():
+                return name.strip()
+
+        return ""
+
+    def _build_manual_stock_name_lookup(self) -> Dict[str, str]:
+        """Build a lookup map for raw and normalized stock-code forms."""
+        overrides = self._get_stock_name_overrides()
+        if not overrides:
+            return {}
+
+        lookup: Dict[str, str] = {}
+        for candidate_code, name in overrides.items():
+            raw_candidate = str(candidate_code or "").strip()
+            if not raw_candidate or not isinstance(name, str):
+                continue
+
+            display_name = name.strip()
+            if not display_name:
+                continue
+
+            candidates = [raw_candidate, raw_candidate.upper()]
+            normalized_candidate = normalize_stock_code(raw_candidate)
+            if normalized_candidate:
+                candidates.extend([normalized_candidate, normalized_candidate.upper()])
+
+            seen = set()
+            for candidate in candidates:
+                if not candidate or candidate in seen:
+                    continue
+                seen.add(candidate)
+                lookup.setdefault(candidate, display_name)
+
+        return lookup
+
+    def _get_manual_stock_name(self, code: str, manual_name_lookup: Optional[Dict[str, str]] = None) -> str:
         """Return a configured display-name override for a stock code."""
+        if manual_name_lookup is not None:
+            return self._lookup_manual_stock_name(code, manual_name_lookup)
+
         overrides = self._get_stock_name_overrides()
         if not overrides:
             return ""
@@ -1251,9 +1308,10 @@ class StockAnalysisPipeline:
         # Issue #455: 预取股票名称，避免并发分析时显示「股票xxxxx」
         # dry_run 仅做数据拉取，不需要名称预取，避免额外网络开销
         if not dry_run:
+            manual_name_lookup = self._build_manual_stock_name_lookup()
             prefetch_codes = [
                 code for code in stock_codes
-                if not self._get_manual_stock_name(code)
+                if not self._get_manual_stock_name(code, manual_name_lookup)
             ]
             if prefetch_codes:
                 self.fetcher_manager.prefetch_stock_names(prefetch_codes, use_bulk=False)

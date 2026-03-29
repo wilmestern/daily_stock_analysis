@@ -63,6 +63,16 @@ class TestPipelinePrefetchBehavior(unittest.TestCase):
             ["600519"], use_bulk=False
         )
 
+    def test_run_non_dry_run_skips_prefetch_for_normalized_manual_named_stocks(self):
+        pipeline = self._build_pipeline(process_result=SimpleNamespace(code="600519"))
+        pipeline.config.stock_name_overrides = {"sh600519": "贵州茅台"}
+
+        pipeline.run(stock_codes=["600519", "AAPL"], dry_run=False, send_notification=False)
+
+        pipeline.fetcher_manager.prefetch_stock_names.assert_called_once_with(
+            ["AAPL"], use_bulk=False
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
