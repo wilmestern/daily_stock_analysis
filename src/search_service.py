@@ -1813,12 +1813,20 @@ class SearchService:
         stock_name: str,
         focus_keywords: Optional[List[str]] = None,
     ) -> bool:
-        """A 股或中文名称/关键词场景下优先中文资讯。"""
+        """A 股或中文名称/关键词场景下优先中文资讯。
+
+        Only returns True when there is a positive Chinese signal:
+        Chinese characters in keywords/stock_name, or a 6-digit A-stock code.
+        Avoids false positives for non-foreign but English contexts like
+        ``stock_code="market", stock_name="US market"``.
+        """
         if any(cls._contains_chinese_text(keyword) for keyword in (focus_keywords or [])):
             return True
         if cls._contains_chinese_text(stock_name):
             return True
-        return not cls._is_foreign_stock(stock_code)
+        # Positive A-stock identification: 6-digit numeric codes (e.g. 600519)
+        code = (stock_code or "").strip()
+        return code.isdigit() and len(code) == 6
 
     @classmethod
     def _is_chinese_news_result(cls, item: SearchResult) -> bool:
