@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 <!-- 新条目格式：- [类型] 描述（类型取值：新功能/改进/修复/文档/测试/chore）-->
 <!-- 每条独立一行追加到本段末尾，无需分类标题，合并时冲突最小 -->
+- [新功能] 新增舆情驱动推荐选股模块 — 通过搜索服务抓取 A股/港股/美股热点舆情，调用 LLM 生成每日推荐选股报告并推送；通过 `STOCK_RECOMMENDATION_ENABLED=true` 启用，`STOCK_RECOMMENDATION_MARKETS` 指定市场（cn/hk/us/all），`STOCK_RECOMMENDATION_COUNT` 控制推荐数量；支持 `--stock-recommend` 独立触发及 `--no-stock-recommend` 临时禁用。
 
 ## [3.12.0] - 2026-04-01
 

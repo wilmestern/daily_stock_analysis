@@ -281,6 +281,18 @@ def parse_arguments() -> argparse.Namespace:
     )
 
     parser.add_argument(
+        '--stock-recommend',
+        action='store_true',
+        help='仅运行舆情驱动推荐选股（区分 A股/港股/美股）'
+    )
+
+    parser.add_argument(
+        '--no-stock-recommend',
+        action='store_true',
+        help='跳过推荐选股（在 STOCK_RECOMMENDATION_ENABLED=true 时可用此参数临时禁用）'
+    )
+
+    parser.add_argument(
         '--force-run',
         action='store_true',
         help='跳过交易日检查，强制执行全量分析（Issue #373）'
@@ -569,6 +581,22 @@ def run_full_analysis(
 
         except Exception as e:
             logger.error(f"飞书文档生成失败: {e}")
+
+        # === 推荐选股 ===
+        if (
+            getattr(config, 'stock_recommendation_enabled', False)
+            and not getattr(args, 'no_stock_recommend', False)
+        ):
+            try:
+                from src.core.stock_recommendation import run_stock_recommendation
+                run_stock_recommendation(
+                    notifier=pipeline.notifier,
+                    analyzer=pipeline.analyzer,
+                    search_service=pipeline.search_service,
+                    send_notification=not args.no_notify,
+                )
+            except Exception as exc:
+                logger.warning("推荐选股流程失败（已忽略）: %s", exc)
 
         # === Auto backtest ===
         try:
@@ -875,6 +903,47 @@ def main() -> int:
                 search_service=search_service,
                 send_notification=not args.no_notify,
                 override_region=effective_region,
+            )
+            return 0
+
+        # 模式1b: 仅推荐选股
+        if getattr(args, 'stock_recommend', False):
+            from src.analyzer import GeminiAnalyzer
+            from src.core.stock_recommendation import run_stock_recommendation
+            from src.notification import NotificationService
+            from src.search_service import SearchService
+
+            logger.info("模式: 仅推荐选股")
+            notifier = NotificationService()
+            search_service = None
+            analyzer = None
+
+            if config.has_search_capability_enabled():
+                search_service = SearchService(
+                    bocha_keys=config.bocha_api_keys,
+                    tavily_keys=config.tavily_api_keys,
+                    brave_keys=config.brave_api_keys,
+                    serpapi_keys=config.serpapi_keys,
+                    minimax_keys=config.minimax_api_keys,
+                    searxng_base_urls=config.searxng_base_urls,
+                    searxng_public_instances_enabled=config.searxng_public_instances_enabled,
+                    news_max_age_days=config.news_max_age_days,
+                    news_strategy_profile=getattr(config, "news_strategy_profile", "short"),
+                )
+
+            if config.gemini_api_key or config.openai_api_key:
+                analyzer = GeminiAnalyzer(api_key=config.gemini_api_key)
+                if not analyzer.is_available():
+                    logger.warning("AI 分析器初始化后不可用，请检查 API Key 配置")
+                    analyzer = None
+            else:
+                logger.warning("未检测到 API Key (Gemini/OpenAI)，将仅输出舆情摘要")
+
+            run_stock_recommendation(
+                notifier=notifier,
+                analyzer=analyzer,
+                search_service=search_service,
+                send_notification=not args.no_notify,
             )
             return 0
 

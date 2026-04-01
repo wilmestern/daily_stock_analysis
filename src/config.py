@@ -659,6 +659,14 @@ class Config:
     # 交易日检查：默认启用，非交易日跳过执行；设为 false 或 --force-run 可强制执行（Issue #373）
     trading_day_check_enabled: bool = True
 
+    # === 推荐选股配置 ===
+    # 是否启用每日舆情驱动推荐选股（默认关闭，需显式开启）
+    stock_recommendation_enabled: bool = False
+    # 推荐选股覆盖市场，逗号分隔，合法值 cn/hk/us；all 表示三市均推荐
+    stock_recommendation_markets: str = "cn"
+    # 每个市场推荐的股票数量（1-10，默认 5）
+    stock_recommendation_count: int = 5
+
     # === 实时行情增强数据配置 ===
     # 实时行情开关（关闭后使用历史收盘价进行分析）
     enable_realtime_quote: bool = True
@@ -1288,6 +1296,12 @@ class Config:
                 os.getenv('MARKET_REVIEW_REGION', 'cn')
             ),
             trading_day_check_enabled=os.getenv('TRADING_DAY_CHECK_ENABLED', 'true').lower() != 'false',
+            stock_recommendation_enabled=os.getenv('STOCK_RECOMMENDATION_ENABLED', 'false').lower() == 'true',
+            stock_recommendation_markets=os.getenv('STOCK_RECOMMENDATION_MARKETS', 'cn').strip() or 'cn',
+            stock_recommendation_count=parse_env_int(
+                os.getenv('STOCK_RECOMMENDATION_COUNT'), 5,
+                field_name='STOCK_RECOMMENDATION_COUNT', minimum=1, maximum=10
+            ),
             webui_enabled=os.getenv('WEBUI_ENABLED', 'false').lower() == 'true',
             webui_host=os.getenv('WEBUI_HOST', '127.0.0.1'),
             webui_port=parse_env_int(os.getenv('WEBUI_PORT'), 8000, field_name='WEBUI_PORT', minimum=1, maximum=65535),
