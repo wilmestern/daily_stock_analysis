@@ -2067,6 +2067,19 @@ class SearchService:
         """Return True when the input contains CJK characters."""
         return bool(value and cls._CHINESE_TEXT_RE.search(value))
 
+    @staticmethod
+    def _join_query_terms(*terms: str) -> str:
+        """Join non-empty query terms while preserving order and removing duplicates."""
+        parts: List[str] = []
+        seen = set()
+        for term in terms:
+            text = (term or "").strip()
+            if not text or text in seen:
+                continue
+            seen.add(text)
+            parts.append(text)
+        return " ".join(parts)
+
     @classmethod
     def _normalize_news_host(cls, value: Optional[str]) -> str:
         """Normalize a URL/source hint into a hostname-like string."""
@@ -2158,6 +2171,32 @@ class SearchService:
         # Positive mainland-stock identification: 6-digit numeric codes (e.g. 600519)
         code = cls._normalize_mainland_stock_code(stock_code)
         return code.isdigit() and len(code) == 6
+
+    @classmethod
+    def _needs_mainland_query_hints(cls, stock_code: str, stock_name: str) -> bool:
+        """Only rewrite A-share queries when the stock name itself lacks Chinese context."""
+        code = cls._normalize_mainland_stock_code(stock_code)
+        return code.isdigit() and len(code) == 6 and not cls._contains_chinese_text(stock_name)
+
+    @classmethod
+    def _build_mainland_preferred_query(
+        cls,
+        stock_code: str,
+        stock_name: str,
+        *extra_terms: str,
+    ) -> str:
+        """Bias A-share searches toward mainland-market results for English-name inputs."""
+        raw_code = (stock_code or "").strip()
+        normalized_code = cls._normalize_mainland_stock_code(stock_code)
+        primary_code = normalized_code if normalized_code.isdigit() and len(normalized_code) == 6 else raw_code
+        return cls._join_query_terms(
+            primary_code,
+            raw_code if raw_code != primary_code else "",
+            stock_name,
+            "A股",
+            "沪深",
+            *extra_terms,
+        )
 
     @classmethod
     def _is_chinese_news_result(cls, item: SearchResult) -> bool:
@@ -2635,6 +2674,13 @@ class SearchService:
         if focus_keywords:
             # 如果提供了关键词，直接使用关键词作为查询
             query = " ".join(focus_keywords)
+        elif prefer_chinese and self._needs_mainland_query_hints(stock_code, stock_name):
+            query = self._build_mainland_preferred_query(
+                stock_code,
+                stock_name,
+                "股票",
+                "最新消息",
+            )
         elif prefer_chinese:
             query = f"{stock_name} {stock_code} 股票 最新消息"
         elif is_foreign:
@@ -2870,6 +2916,7 @@ class SearchService:
         is_foreign = self._is_foreign_stock(stock_code)
         is_index_etf = self.is_index_or_etf(stock_code, stock_name)
         prefer_chinese = self._should_prefer_chinese_news(stock_code, stock_name)
+        mainland_hint_query = prefer_chinese and self._needs_mainland_query_hints(stock_code, stock_name)
 
         if is_foreign:
             search_dimensions = [
@@ -2919,57 +2966,143 @@ class SearchService:
                 },
             ]
         else:
+            latest_news_query = f"{stock_name} {stock_code} 最新 新闻 重大 事件"
+            market_analysis_query = f"{stock_name} 研报 目标价 评级 深度分析"
+            risk_check_query = (
+                f"{stock_name} 指数走势 跟踪误差 净值 表现"
+                if is_index_etf else f"{stock_name} 减持 处罚 违规 诉讼 利空 风险"
+            )
+            announcements_query = (
+                f"{stock_name} {stock_code} 公告 指数调整 成分变化"
+                if is_index_etf else f"{stock_name} {stock_code} 公司公告 重要公告 上交所 深交所 cninfo"
+            )
+            earnings_query = (
+                f"{stock_name} 指数成分 净值 跟踪表现"
+                if is_index_etf else f"{stock_name} 业绩预告 财报 营收 净利润 同比增长"
+            )
+            industry_query = (
+                f"{stock_name} 指数成分股 行业配置 权重"
+                if is_index_etf else f"{stock_name} 所在行业 竞争对手 市场份额 行业前景"
+            )
+
+            if mainland_hint_query:
+                latest_news_query = self._build_mainland_preferred_query(
+                    stock_code,
+                    stock_name,
+                    "最新",
+                    "新闻",
+                    "重大",
+                    "事件",
+                )
+                market_analysis_query = self._build_mainland_preferred_query(
+                    stock_code,
+                    stock_name,
+                    "研报",
+                    "目标价",
+                    "评级",
+                    "深度分析",
+                )
+                risk_check_query = self._build_mainland_preferred_query(
+                    stock_code,
+                    stock_name,
+                    "指数走势",
+                    "跟踪误差",
+                    "净值",
+                    "表现",
+                ) if is_index_etf else self._build_mainland_preferred_query(
+                    stock_code,
+                    stock_name,
+                    "减持",
+                    "处罚",
+                    "违规",
+                    "诉讼",
+                    "利空",
+                    "风险",
+                )
+                announcements_query = self._build_mainland_preferred_query(
+                    stock_code,
+                    stock_name,
+                    "公告",
+                    "指数调整",
+                    "成分变化",
+                ) if is_index_etf else self._build_mainland_preferred_query(
+                    stock_code,
+                    stock_name,
+                    "公司公告",
+                    "重要公告",
+                    "上交所",
+                    "深交所",
+                    "cninfo",
+                )
+                earnings_query = self._build_mainland_preferred_query(
+                    stock_code,
+                    stock_name,
+                    "指数成分",
+                    "净值",
+                    "跟踪表现",
+                ) if is_index_etf else self._build_mainland_preferred_query(
+                    stock_code,
+                    stock_name,
+                    "业绩预告",
+                    "财报",
+                    "营收",
+                    "净利润",
+                    "同比增长",
+                )
+                industry_query = self._build_mainland_preferred_query(
+                    stock_code,
+                    stock_name,
+                    "指数成分股",
+                    "行业配置",
+                    "权重",
+                ) if is_index_etf else self._build_mainland_preferred_query(
+                    stock_code,
+                    stock_name,
+                    "所在行业",
+                    "竞争对手",
+                    "市场份额",
+                    "行业前景",
+                )
+
             search_dimensions = [
                 {
                     'name': 'latest_news',
-                    'query': f"{stock_name} {stock_code} 最新 新闻 重大 事件",
+                    'query': latest_news_query,
                     'desc': '最新消息',
                     'tavily_topic': 'news',
                     'strict_freshness': True,
                 },
                 {
                     'name': 'market_analysis',
-                    'query': f"{stock_name} 研报 目标价 评级 深度分析",
+                    'query': market_analysis_query,
                     'desc': '机构分析',
                     'tavily_topic': None,
                     'strict_freshness': False,
                 },
                 {
                     'name': 'risk_check',
-                    'query': (
-                        f"{stock_name} 指数走势 跟踪误差 净值 表现"
-                        if is_index_etf else f"{stock_name} 减持 处罚 违规 诉讼 利空 风险"
-                    ),
+                    'query': risk_check_query,
                     'desc': '风险排查',
                     'tavily_topic': None if is_index_etf else 'news',
                     'strict_freshness': not is_index_etf,
                 },
                 {
                     'name': 'announcements',
-                    'query': (
-                        f"{stock_name} {stock_code} 公告 指数调整 成分变化"
-                        if is_index_etf else f"{stock_name} {stock_code} 公司公告 重要公告 上交所 深交所 cninfo"
-                    ),
+                    'query': announcements_query,
                     'desc': '公司公告',
                     'tavily_topic': 'news',
                     'strict_freshness': True,
                 },
                 {
                     'name': 'earnings',
-                    'query': (
-                        f"{stock_name} 指数成分 净值 跟踪表现"
-                        if is_index_etf else f"{stock_name} 业绩预告 财报 营收 净利润 同比增长"
-                    ),
+                    'query': earnings_query,
                     'desc': '业绩预期',
                     'tavily_topic': None,
                     'strict_freshness': False,
                 },
                 {
                     'name': 'industry',
-                    'query': (
-                        f"{stock_name} 指数成分股 行业配置 权重"
-                        if is_index_etf else f"{stock_name} 所在行业 竞争对手 市场份额 行业前景"
-                    ),
+                    'query': industry_query,
                     'desc': '行业分析',
                     'tavily_topic': None,
                     'strict_freshness': False,

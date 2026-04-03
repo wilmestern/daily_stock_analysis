@@ -276,6 +276,21 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
                 p1.search.assert_called_once()
                 p2.search.assert_called_once()
 
+    def test_search_stock_news_english_name_a_share_query_adds_mainland_hints(self) -> None:
+        """English-name mainland stocks should add A-share hints to the search query itself."""
+        fresh = datetime.now().date().isoformat()
+        service, mock_search = self._create_service_with_mock_provider(
+            response=_response([_result("中文资讯", fresh)])
+        )
+
+        service.search_stock_news("SH600519", "Kweichow Moutai", max_results=1)
+
+        query = mock_search.call_args.args[0]
+        self.assertTrue(query.startswith("600519"))
+        self.assertIn("Kweichow Moutai", query)
+        self.assertIn("A股", query)
+        self.assertIn("沪深", query)
+
     def test_search_stock_news_prioritizes_chinese_items_within_mixed_results(self) -> None:
         """Chinese items should be ordered ahead of English items in mixed batches."""
         fresh = datetime.now().date().isoformat()
@@ -440,6 +455,35 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
         self.assertEqual(intel["latest_news"].provider, "Mock")
         p1.search.assert_called_once()
         p2.search.assert_called_once()
+
+    def test_search_comprehensive_intel_english_name_a_share_queries_add_mainland_hints(self) -> None:
+        """A-share intel queries should include mainland-market hints for English stock names."""
+        fresh = datetime.now().date().isoformat()
+        service = SearchService(
+            bocha_keys=["dummy_key"],
+            searxng_public_instances_enabled=False,
+            news_max_age_days=3,
+            news_strategy_profile="short",
+        )
+
+        provider = SimpleNamespace(
+            is_available=True,
+            name="P1",
+            search=MagicMock(return_value=_response([_result("中文资讯", fresh)])),
+        )
+        service._providers = [provider]
+
+        with patch("src.search_service.time.sleep"):
+            service.search_comprehensive_intel("SH600519", "Kweichow Moutai", max_searches=2)
+
+        queries = [call.args[0] for call in provider.search.call_args_list]
+        self.assertEqual(len(queries), 2)
+        self.assertIn("A股", queries[0])
+        self.assertIn("沪深", queries[0])
+        self.assertIn("最新", queries[0])
+        self.assertIn("A股", queries[1])
+        self.assertIn("沪深", queries[1])
+        self.assertIn("研报", queries[1])
 
     def test_search_comprehensive_intel_treats_mainland_domain_result_as_preferred(self) -> None:
         """Mainland finance domains should satisfy the preferred-language check for A-share intel."""

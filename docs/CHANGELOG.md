@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 <!-- 新条目格式：- [类型] 描述（类型取值：新功能/改进/修复/文档/测试/chore）-->
 <!-- 每条独立一行追加到本段末尾，无需分类标题，合并时冲突最小 -->
+- [修复] A 股英文名/别名输入现在会在 `search_stock_news()` 与 `search_comprehensive_intel()` 的查询词里自动追加 `A股`、`沪深` 等大陆市场提示，降低仅有单一搜索源时再次被海外资讯结果带偏的概率。
 - [修复] `search_stock_news()` 现在会把 `SHSE.600519`、`SZSE.000001`、`600519.XSHG`、`000001.XSHE` 等交易所限定的 A 股代码也识别为中文优先场景，避免英文股票名输入时再次落回海外资讯结果。
 - [修复] `search_comprehensive_intel()` 现在会在 A 股/中文优先场景下为 Brave 传递 `zh-hans/CN` locale，并在首个 provider 仅返回英文海外资讯时继续尝试后续 provider，避免报告里的“最新消息/机构分析”等情报维度再次被海外结果占满。
 - [修复] **MiniMax-M2.7 模型连接测试支持** — 修复 LLM 通道连接测试在 MiniMax-M2.7 模型下返回 "Empty response" 的问题；增加了 `max_tokens` 上限（8→256）以容纳 MiniMax 思考过程，并添加 `content_blocks` 格式解析逻辑统一处理 MiniMax 响应格式差异。
