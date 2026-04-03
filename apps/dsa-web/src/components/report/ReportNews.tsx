@@ -2,7 +2,7 @@ import type React from 'react';
 import { useState, useEffect, useCallback } from 'react';
 import type { ParsedApiError } from '../../api/error';
 import { getParsedApiError } from '../../api/error';
-import { ApiErrorAlert, Card } from '../common';
+import { ApiErrorAlert, Card, InlineAlert } from '../common';
 import { DashboardPanelHeader, DashboardStateBlock } from '../dashboard';
 import { historyApi } from '../../api/history';
 import type { NewsIntelItem, ReportLanguage } from '../../types/analysis';
@@ -12,12 +12,18 @@ interface ReportNewsProps {
   recordId?: number;  // 分析历史记录主键 ID
   limit?: number;
   language?: ReportLanguage;
+  isHistory?: boolean;
 }
 
 /**
  * 资讯区组件 - 终端风格
  */
-export const ReportNews: React.FC<ReportNewsProps> = ({ recordId, limit = 8, language = 'zh' }) => {
+export const ReportNews: React.FC<ReportNewsProps> = ({
+  recordId,
+  limit = 8,
+  language = 'zh',
+  isHistory = false,
+}) => {
   const reportLanguage = normalizeReportLanguage(language);
   const text = getReportText(reportLanguage);
   const [isLoading, setIsLoading] = useState(false);
@@ -66,13 +72,22 @@ export const ReportNews: React.FC<ReportNewsProps> = ({ recordId, limit = 8, lan
               type="button"
               onClick={() => void fetchNews()}
               className="home-accent-link text-xs"
-              aria-label={text.refresh}
+              aria-label={isHistory ? text.reloadSavedNews : text.refresh}
             >
-              {text.refresh}
+              {isHistory ? text.reloadSavedNews : text.refresh}
             </button>
           </div>
         )}
       />
+
+      {isHistory ? (
+        <InlineAlert
+          variant="warning"
+          title={text.historyNewsSnapshotTitle}
+          message={text.historyNewsSnapshotNotice}
+          className="mb-4 rounded-xl px-4 py-3 text-xs shadow-none"
+        />
+      ) : null}
 
       {error && !isLoading && (
         <ApiErrorAlert

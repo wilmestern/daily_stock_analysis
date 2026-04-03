@@ -52,6 +52,31 @@ describe('ReportNews', () => {
     expect(screen.getByText('可稍后刷新以获取最新资讯。')).toBeInTheDocument();
   });
 
+  it('clarifies that history reports only reload the saved news snapshot', async () => {
+    vi.mocked(historyApi.getNews).mockResolvedValue({
+      total: 1,
+      items: [
+        {
+          title: '历史快照中的资讯',
+          snippet: '这条资讯来自已保存的历史记录。',
+          url: 'https://example.com/history-news',
+        },
+      ],
+    });
+
+    render(<ReportNews recordId={1} isHistory />);
+
+    expect(await screen.findByText('历史快照中的资讯')).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('历史资讯快照');
+    expect(screen.getByRole('alert')).toHaveTextContent('这里展示的是分析生成时保存的资讯结果');
+
+    fireEvent.click(screen.getByRole('button', { name: '重新读取' }));
+
+    await waitFor(() => {
+      expect(historyApi.getNews).toHaveBeenCalledTimes(2);
+    });
+  });
+
   it('localizes the empty state description for english reports', async () => {
     vi.mocked(historyApi.getNews).mockResolvedValue({
       total: 0,

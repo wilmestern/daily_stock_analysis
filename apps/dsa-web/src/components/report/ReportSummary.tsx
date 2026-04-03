@@ -46,7 +46,12 @@ export const ReportSummary: React.FC<ReportSummaryProps> = ({
       <ReportStrategy strategy={strategy} language={reportLanguage} />
 
       {/* 资讯区 */}
-      <ReportNews recordId={recordId} limit={8} language={reportLanguage} />
+      <ReportNews
+        recordId={recordId}
+        limit={8}
+        language={reportLanguage}
+        isHistory={isHistory}
+      />
 
       {/* 透明度与追溯区 */}
       <ReportDetails details={details} recordId={recordId} language={reportLanguage} />
