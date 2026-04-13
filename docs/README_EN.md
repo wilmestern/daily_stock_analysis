@@ -31,7 +31,7 @@ English | [简体中文](../README.md) | [繁體中文](README_CHT.md)
 Join the community to discuss project usage and share technical ideas. The groups are for **project discussion** and **technical sharing** only; **advertising and stock-picking promotion are not allowed**.
 
 - **Telegram**: <https://t.me/+1yyZAGuiiw8xYmQ9>
-- **WeChat groups**: Existing groups are already over 200 members. Add the assistant `_oox_xoo` for an invite
+- **WeChat groups**: Existing groups are already over 200 members. Add the assistant ``_oox_xoo`` for an invite
 - **Xiaohongshu**: Follow updates here <https://www.xiaohongshu.com/user/profile/61594417000000000201fa68>
 
 ## 💖 Sponsors
