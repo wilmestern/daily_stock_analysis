@@ -385,6 +385,7 @@ def load_recent_history_df(
 ) -> Tuple[pd.DataFrame, str]:
     """Load recent history from DB, backfilling from the shared fetcher when needed."""
     requested_days = _normalize_days(days)
+    expected_target_date = _resolve_expected_target_date(stock_code, target_date)
     cached, source_name = ensure_min_history_cached(
         stock_code,
         requested_days,
@@ -400,5 +401,26 @@ def load_recent_history_df(
     )
     if not bars:
         return pd.DataFrame(), db_source if cached else source_name
+
+    if not _is_history_fresh(bars, expected_target_date):
+        latest_bar_date = _get_latest_bar_date(bars)
+        stale_message = (
+            source_name
+            if not cached
+            else (
+                f"Stale historical data for {stock_code} "
+                f"(latest={latest_bar_date}, expected>={expected_target_date})"
+            )
+        )
+        logger.warning(
+            "load_recent_history_df(%s): discarding stale history ending at %s "
+            "(expected>=%s, cached=%s, source=%s)",
+            stock_code,
+            latest_bar_date,
+            expected_target_date,
+            cached,
+            db_source or source_name,
+        )
+        return pd.DataFrame(), stale_message
 
     return _bars_to_dataframe(bars), db_source or source_name

@@ -311,6 +311,28 @@ class StockHistoryCacheTestCase(unittest.TestCase):
         self.assertIn("boom", second_source)
         manager.get_daily_data.assert_called_once_with("600519", days=AGENT_HISTORY_BASELINE_DAYS)
 
+    def test_stale_db_is_not_returned_when_refresh_fails(self) -> None:
+        target_date = date(2026, 4, 16)
+        db = _DummyDB()
+        db.seed("600519", 120, end_date=target_date - timedelta(days=1), source="stale-db")
+
+        from unittest.mock import MagicMock, patch
+
+        manager = MagicMock()
+        manager.get_daily_data.side_effect = RuntimeError("boom")
+
+        with patch("src.services.stock_history_cache.get_db", return_value=db):
+            df, source = load_recent_history_df(
+                "600519",
+                days=60,
+                target_date=target_date,
+                fetcher_manager=manager,
+            )
+
+        self.assertTrue(df.empty)
+        self.assertIn("boom", source)
+        manager.get_daily_data.assert_called_once_with("600519", days=AGENT_HISTORY_BASELINE_DAYS)
+
     def test_stale_successful_attempt_does_not_bypass_freshness_check(self) -> None:
         target_date = date(2026, 4, 16)
         db = _DummyDB()
@@ -351,7 +373,7 @@ class StockHistoryCacheTestCase(unittest.TestCase):
                 fetcher_manager=manager,
             )
 
-        self.assertEqual(len(first_df), 120)
+        self.assertTrue(first_df.empty)
         self.assertEqual(len(second_df), 120)
         self.assertEqual(second_df.iloc[-1]["date"], target_date)
         self.assertEqual(second_source, "Fetcher")
