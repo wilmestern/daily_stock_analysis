@@ -40,6 +40,10 @@ from src.services.stock_history_cache import (
     AGENT_HISTORY_BASELINE_DAYS,
     ensure_min_history_cached,
     rank_history_bars,
+    reset_agent_frozen_target_date,
+    reset_candidate_pick_cache,
+    set_agent_frozen_target_date,
+    set_candidate_pick_cache,
 )
 from src.enums import ReportType
 from src.stock_analyzer import StockTrendAnalyzer, TrendAnalysisResult
@@ -437,6 +441,7 @@ class StockAnalysisPipeline:
                     chip_data,
                     fundamental_context,
                     trend_result,
+                    current_time=current_time,
                 )
 
             # Step 4: 多维度情报搜索（最新消息+风险排查+业绩预期）
@@ -812,6 +817,7 @@ class StockAnalysisPipeline:
         chip_data: Optional[ChipDistribution],
         fundamental_context: Optional[Dict[str, Any]] = None,
         trend_result: Optional[TrendAnalysisResult] = None,
+        current_time: Optional[datetime] = None,
     ) -> Optional[AnalysisResult]:
         """
         使用 Agent 模式分析单只股票。
@@ -823,6 +829,8 @@ class StockAnalysisPipeline:
             # Build executor from shared factory (ToolRegistry and SkillManager prototype are cached)
             executor = build_agent_executor(self.config, getattr(self.config, 'agent_skills', None) or None)
 
+            frozen_target_date = self._resolve_resume_target_date(code, current_time=current_time)
+
             # Build initial context to avoid redundant tool calls
             initial_context = {
                 "stock_code": code,
@@ -830,6 +838,7 @@ class StockAnalysisPipeline:
                 "report_type": report_type.value,
                 "report_language": report_language,
                 "fundamental_context": fundamental_context,
+                "frozen_target_date": frozen_target_date.isoformat(),
             }
             
             if realtime_quote:
@@ -860,7 +869,18 @@ class StockAnalysisPipeline:
                 message = f"Analyze stock {code} ({stock_name}) and return the full decision dashboard JSON in English."
             else:
                 message = f"请分析股票 {code} ({stock_name})，并生成决策仪表盘报告。"
-            agent_result = executor.run(message, context=initial_context)
+            # 用独立 try/finally 仅包裹 executor.run(...) 做 ContextVar 管理。
+            # set_agent_frozen_target_date 把 pipeline 冻结的目标交易日注入当前上下文，
+            # set_candidate_pick_cache 提供同一次分析内多次 tool 调用共享的候选 rank 缓存；
+            # 两者均与业务异常处理（外层 try/except）完全解耦，保证即便 Agent 业务逻辑抛
+            # 异常也能把 ContextVar 释放干净，避免跨 pipeline 运行的污染。
+            frozen_token = set_agent_frozen_target_date(frozen_target_date)
+            cache_token = set_candidate_pick_cache({})
+            try:
+                agent_result = executor.run(message, context=initial_context)
+            finally:
+                reset_candidate_pick_cache(cache_token)
+                reset_agent_frozen_target_date(frozen_token)
 
             # 转换为 AnalysisResult
             result = self._agent_result_to_analysis_result(agent_result, code, stock_name, report_type, query_id)
