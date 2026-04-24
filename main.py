@@ -67,10 +67,11 @@ Examples:
         default=os.getenv("REPORT_OUTPUT_DIR", "reports/"),
         help="Directory to save analysis reports",
     )
+    # Changed default to True so I always get detailed logs during personal use
     parser.add_argument(
         "--verbose",
         action="store_true",
-        default=False,
+        default=True,
         help="Enable verbose/debug logging",
     )
     parser.add_argument(
@@ -99,44 +100,4 @@ def validate_date(date_str: str) -> Optional[date]:
             logger.warning("Analysis date %s is in the future; results may be incomplete.", date_str)
         return parsed
     except ValueError:
-        logger.error("Invalid date format '%s'. Expected YYYY-MM-DD.", date_str)
-        return None
-
-
-def main() -> int:
-    """Main execution function. Returns exit code."""
-    args = parse_arguments()
-
-    if args.verbose:
-        logging.getLogger().setLevel(logging.DEBUG)
-        logger.debug("Verbose logging enabled.")
-
-    # Ensure required directories exist
-    setup_directories(args.output)
-
-    # Validate the analysis date
-    analysis_date = validate_date(args.date)
-    if analysis_date is None:
-        return 1
-
-    logger.info("Starting daily stock analysis for date: %s", analysis_date)
-
-    # Determine symbols to analyze
-    symbols = args.symbols
-    if not symbols:
-        logger.error("No stock symbols provided. Use --symbols or specify a --config file.")
-        return 1
-
-    logger.info("Analyzing %d symbol(s): %s", len(symbols), ", ".join(symbols))
-
-    if args.dry_run:
-        logger.info("[DRY RUN] Analysis complete. No reports were saved.")
-    else:
-        logger.info("Reports will be saved to: %s", args.output)
-
-    logger.info("Analysis pipeline initialized successfully.")
-    return 0
-
-
-if __name__ == "__main__":
-    sys.exit(main())
+        logger.error("Invalid date format '%s'. Expec
