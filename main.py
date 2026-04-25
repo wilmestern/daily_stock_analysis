@@ -99,5 +99,3 @@ def validate_date(date_str: str) -> Optional[date]:
         if parsed > date.today():
             logger.warning("Analysis date %s is in the future; results may be incomplete.", date_str)
         return parsed
-    except ValueError:
-        logger.error("Invalid date format '%s'. Expec
