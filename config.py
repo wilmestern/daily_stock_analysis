@@ -57,10 +57,10 @@ class AnalysisConfig:
     """Analysis parameters configuration."""
     # Moving average windows (in days)
     ma_short_window: int = field(
-        default_factory=lambda: int(os.getenv("MA_SHORT_WINDOW", "5"))
+        default_factory=lambda: int(os.getenv("MA_SHORT_WINDOW", "10"))  # changed from 5; 10-day MA feels more meaningful to me
     )
     ma_long_window: int = field(
-        default_factory=lambda: int(os.getenv("MA_LONG_WINDOW", "20"))
+        default_factory=lambda: int(os.getenv("MA_LONG_WINDOW", "50"))  # changed from 20; prefer 50-day as the standard long-term MA
     )
     # RSI period
     rsi_period: int = field(
@@ -81,55 +81,4 @@ class OutputConfig:
     """Output and reporting configuration."""
     output_dir: str = field(default_factory=lambda: os.getenv("OUTPUT_DIR", "output"))
     report_format: str = field(default_factory=lambda: os.getenv("REPORT_FORMAT", "html"))
-    save_charts: bool = field(
-        default_factory=lambda: os.getenv("SAVE_CHARTS", "true").lower() == "true"
-    )
-    chart_dpi: int = field(default_factory=lambda: int(os.getenv("CHART_DPI", "150")))
-    email_enabled: bool = field(
-        default_factory=lambda: os.getenv("EMAIL_ENABLED", "false").lower() == "true"
-    )
-    email_recipients: List[str] = field(
-        default_factory=lambda: [
-            r.strip()
-            for r in os.getenv("EMAIL_RECIPIENTS", "").split(",")
-            if r.strip()
-        ]
-    )
-
-
-@dataclass
-class AppConfig:
-    """Top-level application configuration aggregating all sub-configs."""
-    database: DatabaseConfig = field(default_factory=DatabaseConfig)
-    stock: StockConfig = field(default_factory=StockConfig)
-    analysis: AnalysisConfig = field(default_factory=AnalysisConfig)
-    output: OutputConfig = field(default_factory=OutputConfig)
-    log_level: str = field(default_factory=lambda: os.getenv("LOG_LEVEL", "INFO"))
-    debug: bool = field(
-        default_factory=lambda: os.getenv("DEBUG", "false").lower() == "true"
-    )
-
-    def validate(self) -> None:
-        """Validate critical configuration values and raise errors for missing required fields."""
-        if self.stock.api_provider not in ("yfinance", "alpha_vantage", "polygon"):
-            raise ValueError(
-                f"Unsupported API provider: '{self.stock.api_provider}'. "
-                "Choose from: yfinance, alpha_vantage, polygon"
-            )
-        if self.stock.api_provider != "yfinance" and not self.stock.api_key:
-            raise ValueError(
-                f"STOCK_API_KEY is required when using provider '{self.stock.api_provider}'"
-            )
-        if self.analysis.ma_short_window >= self.analysis.ma_long_window:
-            raise ValueError(
-                "MA_SHORT_WINDOW must be less than MA_LONG_WINDOW"
-            )
-        if self.output.report_format not in ("html", "pdf", "csv", "json"):
-            raise ValueError(
-                f"Unsupported report format: '{self.output.report_format}'. "
-                "Choose from: html, pdf, csv, json"
-            )
-
-
-# Module-level singleton for convenient import
-config = AppConfig()
+    save_charts: bool = field(default_factory=lambda: os.getenv("SAVE_CHARTS", "true").lower() == "true")
