@@ -53,3 +53,5 @@ openpyxl>=3.1.0
 jupyter>=1.0.0
 # ipywidgets: enables interactive widgets (sliders, dropdowns) inside Jupyter notebooks
 ipywidgets>=8.0.0
+# yfinance: fallback data source for non-A-share tickers (e.g. US stocks I occasionally track)
+yfinance>=0.2.18
