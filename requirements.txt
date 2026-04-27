@@ -39,3 +39,7 @@ pytest-cov>=4.0.0
 tqdm>=4.64.0
 pytz>=2022.6
 arrow>=1.2.3
+
+# Personal additions
+# rich: nicer terminal output for debugging and manual runs
+rich>=12.6.0
