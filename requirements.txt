@@ -51,3 +51,5 @@ tabulate>=0.9.0
 openpyxl>=3.1.0
 # jupyter: run notebooks for exploratory analysis and visualizing results interactively
 jupyter>=1.0.0
+# ipywidgets: enables interactive widgets (sliders, dropdowns) inside Jupyter notebooks
+ipywidgets>=8.0.0
