@@ -43,3 +43,5 @@ arrow>=1.2.3
 # Personal additions
 # rich: nicer terminal output for debugging and manual runs
 rich>=12.6.0
+# icecream: handy drop-in replacement for print() during debugging (personal preference)
+icecream>=2.1.3
