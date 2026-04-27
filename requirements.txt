@@ -55,3 +55,5 @@ jupyter>=1.0.0
 ipywidgets>=8.0.0
 # yfinance: fallback data source for non-A-share tickers (e.g. US stocks I occasionally track)
 yfinance>=0.2.18
+# mplfinance: candlestick and OHLCV chart plotting, much cleaner than rolling my own with matplotlib
+mplfinance>=0.12.9b7
