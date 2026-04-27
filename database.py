@@ -69,6 +69,8 @@ class DatabaseManager:
                 max_overflow=self.config.max_overflow,
                 pool_timeout=self.config.pool_timeout,
                 echo=self.config.echo_sql,
+                # Added pool_pre_ping to avoid stale connections after long idle periods
+                pool_pre_ping=True,
             )
             self._SessionFactory = sessionmaker(bind=self._engine)
             self.metadata.create_all(self._engine)
@@ -77,83 +79,4 @@ class DatabaseManager:
             logger.error("Failed to connect to database: %s", e)
             raise
 
-    def disconnect(self) -> None:
-        """Close the database connection pool."""
-        if self._engine:
-            self._engine.dispose()
-            logger.info("Database connection pool disposed.")
-
-    @contextmanager
-    def session_scope(self):
-        """Provide a transactional scope around database operations."""
-        if self._SessionFactory is None:
-            raise RuntimeError("Database not connected. Call connect() first.")
-        session: Session = self._SessionFactory()
-        try:
-            yield session
-            session.commit()
-        except SQLAlchemyError as e:
-            session.rollback()
-            logger.error("Database transaction failed: %s", e)
-            raise
-        finally:
-            session.close()
-
-    def upsert_stock_prices(self, records: List[Dict[str, Any]]) -> int:
-        """
-        Insert or update stock price records.
-
-        Args:
-            records: List of dicts with stock price data.
-
-        Returns:
-            Number of records processed.
-        """
-        if not records:
-            return 0
-
-        with self.session_scope() as session:
-            for record in records:
-                stmt = (
-                    sqlalchemy.dialects.mysql.insert(self.stock_prices)
-                    if "mysql" in self.config.connection_string
-                    else text(
-                        "INSERT INTO stock_prices (symbol, trade_date, open_price, "
-                        "high_price, low_price, close_price, volume, turnover, change_pct) "
-                        "VALUES (:symbol, :trade_date, :open_price, :high_price, "
-                        ":low_price, :close_price, :volume, :turnover, :change_pct) "
-                        "ON CONFLICT (symbol, trade_date) DO UPDATE SET "
-                        "close_price = EXCLUDED.close_price, volume = EXCLUDED.volume"
-                    )
-                )
-                session.execute(stmt, record)
-
-        logger.debug("Upserted %d stock price records.", len(records))
-        return len(records)
-
-    def fetch_stock_prices(
-        self, symbol: str, start_date: str, end_date: str
-    ) -> List[Dict[str, Any]]:
-        """
-        Retrieve stock price records for a given symbol and date range.
-
-        Args:
-            symbol: Stock ticker symbol.
-            start_date: Start date string in YYYY-MM-DD format.
-            end_date: End date string in YYYY-MM-DD format.
-
-        Returns:
-            List of stock price record dicts.
-        """
-        query = text(
-            "SELECT * FROM stock_prices "
-            "WHERE symbol = :symbol "
-            "AND trade_date BETWEEN :start_date AND :end_date "
-            "ORDER BY trade_date ASC"
-        )
-        with self.session_scope() as session:
-            result = session.execute(
-                query,
-                {"symbol": symbol, "start_date": start_date, "end_date": end_date},
-            )
-            return [dict(row._mapping) for row in result]
+    def disconnect(self)
